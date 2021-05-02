@@ -36,8 +36,6 @@ volatile int prev_time_z = 0;
 
 int default_angle_wing = 80;
 int servo_angle_wing = default_angle_wing;
-//int currentWingAngle = default_angle_wing;
-//int wingUpdateDifference;
 
 float flap_constant = 0.045;
 float voltageReading = 0;
