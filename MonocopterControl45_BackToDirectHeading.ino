@@ -1,6 +1,7 @@
-#define rcPin1 A3   // Pin 8 Connected to CH1 of Transmitter;
-#define rcPin2 A2   // Pin 9 Connected to CH2
-#define rcPin3 A1   // Wing
+#define rcPin1 A3   // Connected to CH1 of Transmitter
+#define rcPin2 A2   // Connected to CH2 of transmitter
+#define rcPin3 A1   // Connected to CH3 of transmitter
+// The motor is controlled directly from the receiver, independently of the Arduino
 #define buzzerPin 5
 #define wingPin 2
 #define blueLedMCCU 9
@@ -15,12 +16,12 @@
 
 QMC5883L compass;
 Servo ServoWing;
-int x_mid = 1520;
+int x_mid = 1520; // Check the middle value on your transmitter
 int y_mid = 1500;
 int z_mid = 1520;
 int heading;
-volatile int x = x_mid;  // Receiver Channel 2 PPM value
-volatile int y = y_mid;  // Receiver Channel 1 PPM value
+volatile int x = x_mid;
+volatile int y = y_mid;
 volatile int z = z_mid;
 float flight_bearing;
 float current_bearing;
@@ -33,7 +34,6 @@ volatile int prev_time_x = 0;
 volatile int prev_time_y = 0;
 volatile int prev_time_z = 0;
 
-//float default_angle_wing = 90;
 int default_angle_wing = 80;
 int servo_angle_wing = default_angle_wing;
 //int currentWingAngle = default_angle_wing;
@@ -43,14 +43,6 @@ float flap_constant = 0.045;
 float voltageReading = 0;
 int cycleCounter = 0;
 #define cycleDelay 60
-
-//bool rotation_reset = false;
-//unsigned long rotation_start_time;
-//float previous_last_rotation_time;
-//float last_rotation_time;
-//float predicted_rotation_time;
-//float current_rotation_progress;
-
 
 void setup() {
   pinMode(rcPin1, INPUT);
@@ -70,7 +62,7 @@ void setup() {
 
   //Serial.begin(9600);
 
-  attachPCINT(digitalPinToPCINT(rcPin1), rising_x, RISING);
+  attachPCINT(digitalPinToPCINT(rcPin1), rising_x, RISING); //  PWM values from the receiver are read using pin change interrupts
   attachPCINT(digitalPinToPCINT(rcPin2), rising_y, RISING);
   attachPCINT(digitalPinToPCINT(rcPin3), rising_z, RISING);
   delay(500);
@@ -79,11 +71,11 @@ void setup() {
 
 void loop() {
 
-  if (cycleCounter == cycleDelay) {
-    voltageReading = analogRead(A7)*0.00983;
-    //Serial.println(voltageReading);
-    if (voltageReading > 5.00 and voltageReading < 7.45 and z_vec > 60) {
-      //PORTC = PORTC | B00100000;  //not working for some reason
+  if (cycleCounter == cycleDelay) {                                           //  A section of code executed every (cycleDelay)th cycle, 
+    voltageReading = analogRead(A7)*0.00983;                                  //  here it checks if the battery voltage (measured by a
+    //Serial.println(voltageReading);                                         //  potential divider) is within the safe range, if I
+    if (voltageReading > 5.00 and voltageReading < 7.45 and z_vec > 60) {     //  want it to check (I use Channel 3 for this)
+      //PORTC = PORTC | B00100000;  //  not working for some reason
       digitalWrite(buzzerPin, HIGH);
     }
     else {
@@ -101,7 +93,6 @@ void loop() {
   x_vec = x_mid - x;
   y_vec = y_mid - y;
   z_vec = z_mid - z;
-  //Serial.println(z_vec);
 
   heading = compass.readHeading();
 
@@ -109,32 +100,14 @@ void loop() {
     
   }
 
-  /*else if (heading >= 270 and heading <=360 and rotation_reset == true) {
-    previous_last_rotation_time = last_rotation_time;
-    last_rotation_time = millis() - rotation_start_time;
-    rotation_start_time = millis();
-    rotation_reset = false;
-    //Serial.println("At 360");
-  }
-
-  else if (heading >= 90 and heading <= 180 and rotation_reset == false) {
-    rotation_reset = true;
-    //Serial.println("At 180");
-  }*/
-
   else {
     current_bearing = heading;
   }
 
-  //predicted_rotation_time = last_rotation_time * (last_rotation_time / previous_last_rotation_time);
-  //current_rotation_progress = (float(millis() - rotation_start_time) / float(predicted_rotation_time));
-  //current_bearing = 360 - (360 * current_rotation_progress);
-  //current_bearing = constrain(current_bearing, 0, 360);
-
-
+   // North-South indicator LEDs on the MCCU control board:
   if (current_bearing > 80 and current_bearing < 160) {
     //digitalWrite(blueLedMCCU, HIGH);
-    PORTB = PORTB | B00000010;
+    PORTB = PORTB | B00000010;  //  Using direct port manipulation here to increase speed
   }
 
   else {
@@ -153,7 +126,7 @@ void loop() {
   }
 
 
-
+  //  North-South indicator LEDs on the tip of the wing:
   if ((current_bearing >= 0 and current_bearing < 90) or (current_bearing >= 270 and current_bearing <= 360)) {
     digitalWrite(blueLedWing, HIGH);
     digitalWrite(redLedWing, LOW);
@@ -172,6 +145,7 @@ void loop() {
 
   flight_magnitude = sqrt(sq(x_vec) + sq(y_vec));
   flight_magnitude = constrain(flight_magnitude, 0, 360);
+  //  To make sure that moving the stick on the transmitter diagonally does not result in a greater flight_magnitude
 
 
   if ((x_vec >= 0) && (y_vec >= 0)){
@@ -197,7 +171,6 @@ void loop() {
   //Serial.println(flight_bearing);
   //Serial.println(flight_magnitude);
 
-
   if (flight_magnitude > 40) {
     servo_angle_wing = default_angle_wing - (flap_constant * flight_magnitude * sin(0.01745329 * (current_bearing - flight_bearing) + 3.14159));
   }
@@ -208,10 +181,9 @@ void loop() {
 
   ServoWing.write(servo_angle_wing);
 
-  
 }
 
-
+// The pin change interrupt service routines
 void rising_x() {
   attachPCINT(digitalPinToPCINT(rcPin1), falling_x, FALLING);
   prev_time_x = micros();
